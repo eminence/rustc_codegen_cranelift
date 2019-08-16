@@ -416,7 +416,8 @@ pub fn codegen_intrinsic_call<'tcx>(
     intrinsic_match! {
         fx, intrinsic, substs, args,
         _ => {
-            unimpl!("unsupported intrinsic {}", intrinsic)
+            fx.tcx.sess.warn(&format!("unsupported llvm intrinsic {}; replacing with trap", intrinsic));
+            crate::trap::trap_unimplemented(fx, intrinsic);
         };
 
         assume, (c _a) {};
@@ -1042,6 +1043,8 @@ pub fn codegen_intrinsic_call<'tcx>(
             let ret_lane = v.value_field(fx, mir::Field::new(idx.try_into().unwrap()));
             ret.write_cvalue(fx, ret_lane);
         };
+
+        // simd_insert
 
         simd_add, (c x, c y) {
             simd_int_flt_binop!(fx, intrinsic, iadd|fadd(x, y) -> ret);
