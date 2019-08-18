@@ -205,6 +205,10 @@ pub fn write_clif_file<'tcx>(
 ) {
     use std::io::Write;
 
+    if std::env::var("CG_CLIF_NO_WRITE_IR").is_ok() {
+        return;
+    }
+
     let symbol_name = tcx.symbol_name(instance).name.as_str();
     let clif_file_name = format!(
         "{}/{}__{}.{}.clif",
