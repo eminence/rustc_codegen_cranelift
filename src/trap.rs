@@ -80,6 +80,9 @@ pub fn trap_unimplemented(
     codegen_print(fx, msg.as_ref());
     let true_ = fx.bcx.ins().iconst(types::I32, 1);
     fx.bcx.ins().trapnz(true_, TrapCode::User(!0));
+    let err_ebb = fx.bcx.create_ebb();
+    fx.bcx.ins().jump(err_ebb, &[]);
+    fx.bcx.switch_to_block(err_ebb);
 }
 
 /// Like `trap_unreachable` but returns a fake value of the specified type.

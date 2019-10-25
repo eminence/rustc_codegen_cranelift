@@ -176,6 +176,9 @@ fn codegen_fn_content(fx: &mut FunctionCx<'_, '_, impl Backend>) {
                 } else {
                     fx.bcx.ins().brz(cond, target, &[]);
                 };
+                let err_ebb = fx.bcx.create_ebb();
+                fx.bcx.ins().jump(err_ebb, &[]);
+                fx.bcx.switch_to_block(err_ebb);
                 trap_panic(
                     fx,
                     format!(
