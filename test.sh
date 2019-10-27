@@ -7,7 +7,7 @@ if [[ "$1" == "--release" ]]; then
     cargo build --release $CG_CLIF_COMPILE_FLAGS
 else
     export CHANNEL='debug'
-    cargo build $CG_CLIF_COMPILE_FLAGS
+    cargo build $CG_CLIF_COMPILE_FLAGS --features backend_object
 fi
 
 source config.sh
@@ -31,7 +31,7 @@ $RUSTC example/mini_core.rs --crate-name mini_core --crate-type lib,dylib
 echo "[BUILD] example"
 $RUSTC example/example.rs --crate-type lib
 
-JIT_ARGS="abc bcd" jit mini_core_hello_world example/mini_core_hello_world.rs
+#JIT_ARGS="abc bcd" jit mini_core_hello_world example/mini_core_hello_world.rs
 
 echo "[AOT] mini_core_hello_world"
 $RUSTC example/mini_core_hello_world.rs --crate-name mini_core_hello_world --crate-type bin
@@ -86,7 +86,7 @@ echo "[TEST] rust-lang/regex example shootout-regex-dna"
 ../cargo.sh clean
 # Make sure `[codegen mono items] start` doesn't poison the diff
 ../cargo.sh build --example shootout-regex-dna
-cat examples/regexdna-input.txt | ../cargo.sh run --example shootout-regex-dna > res.txt
+cat examples/regexdna-input.txt | ../cargo.sh run --example shootout-regex-dna | grep -v "Threads are not yet" > res.txt
 diff -u res.txt examples/regexdna-output.txt
 
 echo "[TEST] rust-lang/regex tests"

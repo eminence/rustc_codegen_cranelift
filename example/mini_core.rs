@@ -1,6 +1,6 @@
 #![feature(
     no_core, lang_items, intrinsics, unboxed_closures, type_ascription, extern_types,
-    untagged_unions, decl_macro, rustc_attrs, transparent_unions
+    untagged_unions, decl_macro, rustc_attrs, transparent_unions, thread_local,
 )]
 #![no_core]
 #![allow(dead_code)]
@@ -538,3 +538,11 @@ pub macro line() { /* compiler built-in */ }
 pub macro cfg() { /* compiler built-in */ }
 
 pub static A_STATIC: u8 = 42;
+
+#[no_mangle]
+pub fn get_tls() -> u8 {
+    #[thread_local]
+    static A: u8 = 42;
+
+    A
+}

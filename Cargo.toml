@@ -40,15 +40,16 @@ default-features = false
 features = ["compression", "read", "std"] # We don't need WASM support
 
 # Uncomment to use local checkout of cranelift
-#[patch."https://github.com/bytecodealliance/cranelift/"]
-#cranelift = { path = "../cranelift/cranelift-umbrella", default-features = false, features = ["std"] }
-#cranelift-module = { path = "../cranelift/cranelift-module" }
-#cranelift-simplejit = { path = "../cranelift/cranelift-simplejit" }
-#cranelift-faerie = { path = "../cranelift/cranelift-faerie" }
-#cranelift-object = { path = "../cranelift/cranelift-object" }
+[patch."https://github.com/bytecodealliance/cranelift/"]
+cranelift = { path = "../cranelift/cranelift-umbrella", default-features = false, features = ["std"] }
+cranelift-module = { path = "../cranelift/cranelift-module" }
+cranelift-simplejit = { path = "../cranelift/cranelift-simplejit" }
+cranelift-faerie = { path = "../cranelift/cranelift-faerie" }
+cranelift-object = { path = "../cranelift/cranelift-object" }
 
-#[patch.crates-io]
+[patch.crates-io]
 #gimli = { path = "../" }
+object = { path = "./object" }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
 cranelift-simplejit = { git = "https://github.com/bytecodealliance/cranelift/" }

@@ -124,6 +124,7 @@ fn build_vtable<'tcx>(
             &format!("vtable.{:?}.for.{:?}", trait_ref, ty),
             Linkage::Local,
             false,
+            false,
             Some(
                 fx.tcx
                     .data_layout

@@ -250,6 +250,10 @@ fn default_call_conv(sess: &Session) -> CallConv {
 }
 
 fn build_isa(sess: &Session, enable_pic: bool) -> Box<dyn isa::TargetIsa + 'static> {
+    use target_lexicon::BinaryFormat;
+
+    let target_triple = crate::target_triple(sess);
+
     let mut flags_builder = settings::builder();
     if enable_pic {
         flags_builder.enable("is_pic").unwrap();
@@ -268,6 +272,14 @@ fn build_isa(sess: &Session, enable_pic: bool) -> Box<dyn isa::TargetIsa + 'stat
         )
         .unwrap();
 
+    let tls_model = match target_triple.binary_format {
+        BinaryFormat::Elf => "tls_gd",
+        BinaryFormat::Macho => "macho",
+        BinaryFormat::Coff => "coff",
+        _ => "none",
+    };
+    flags_builder.set("tls_model", tls_model).unwrap();
+
     // FIXME(CraneStation/cranelift#732) fix LICM in presence of jump tables
     /*
     use rustc::session::config::OptLevel;
@@ -284,7 +296,6 @@ fn build_isa(sess: &Session, enable_pic: bool) -> Box<dyn isa::TargetIsa + 'stat
         }
     }*/
 
-    let target_triple = crate::target_triple(sess);
     let flags = settings::Flags::new(flags_builder);
     cranelift::codegen::isa::lookup(target_triple)
         .unwrap()
