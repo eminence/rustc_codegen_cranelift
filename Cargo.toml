@@ -33,9 +33,9 @@ libloading = "0.5.1"
 [dependencies.object]
 # FIXME remove git and rev once cranelift switches back to a crates.io release of object
 git = "https://github.com/gimli-rs/object"
-rev = "cba3ed4932e4c594c5eab4f5ef6c51838f4a5056"
+rev = "4b5be7274282aa1df2c302dd13e8962ea9ae0e0d"
 
-version = "0.15.0"
+version = "0.16.0"
 default-features = false
 features = ["compression", "read", "std"] # We don't need WASM support
 
@@ -47,7 +47,7 @@ cranelift-simplejit = { path = "../cranelift/cranelift-simplejit" }
 cranelift-faerie = { path = "../cranelift/cranelift-faerie" }
 cranelift-object = { path = "../cranelift/cranelift-object" }
 
-[patch.crates-io]
+[patch."https://github.com/gimli-rs/object"]
 #gimli = { path = "../" }
 object = { path = "./object" }
 
