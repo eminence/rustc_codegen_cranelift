@@ -9,6 +9,7 @@ use rustc_mir::interpret::{
     StackPopInfo,
 };
 
+use cranelift::codegen::ir::GlobalValue;
 use cranelift_module::*;
 
 use crate::prelude::*;
@@ -94,41 +95,65 @@ pub fn trans_const_value<'tcx>(
 ) -> CValue<'tcx> {
     let ty = fx.monomorphize(&const_.ty);
     let layout = fx.layout_of(ty);
-    match ty.kind {
-        ty::Bool | ty::Uint(_) => {
-            let bits = const_.val.try_to_bits(layout.size).unwrap();
-            CValue::const_val(fx, ty, bits)
-        }
-        ty::Int(_) => {
-            let bits = const_.val.try_to_bits(layout.size).unwrap();
-            CValue::const_val(
-                fx,
-                ty,
-                rustc::mir::interpret::sign_extend(bits, layout.size),
-            )
-        }
-        ty::Float(fty) => {
-            let bits = const_.val.try_to_bits(layout.size).unwrap();
-            let val = match fty {
-                FloatTy::F32 => fx
-                    .bcx
-                    .ins()
-                    .f32const(Ieee32::with_bits(u32::try_from(bits).unwrap())),
-                FloatTy::F64 => fx
-                    .bcx
-                    .ins()
-                    .f64const(Ieee64::with_bits(u64::try_from(bits).unwrap())),
-            };
-            CValue::by_val(val, layout)
-        }
-        ty::FnDef(_def_id, _substs) => CValue::by_ref(
+
+    if layout.is_zst() {
+        return CValue::by_ref(
             fx.bcx
                 .ins()
-                .iconst(fx.pointer_type, fx.pointer_type.bytes() as i64),
+                .iconst(fx.pointer_type, i64::try_from(layout.align.pref.bytes()).unwrap()),
             layout,
-        ),
-        _ => trans_const_place(fx, const_).to_cvalue(fx),
+        );
     }
+
+    if let Some(_) = fx.clif_type(layout.ty) {
+        let val = match const_.val {
+            ConstKind::Value(val) => val,
+            _ => bug!("encountered bad ConstKind in codegen"),
+        };
+        match val {
+            ConstValue::Scalar(x) => {
+                match x {
+                    Scalar::Raw { data, size } => {
+                        assert_eq!(u64::from(size), layout.size.bytes());
+                        return CValue::const_val(fx, layout.ty, data);
+                    }
+                    Scalar::Ptr(ptr) => {
+                        let alloc_kind = fx.tcx.alloc_map.lock().get(ptr.alloc_id);
+                        let base_addr = match alloc_kind {
+                            Some(GlobalAlloc::Memory(alloc)) => {
+                                fx.constants_cx.todo.insert(TodoItem::Alloc(ptr.alloc_id));
+                                let data_id = data_id_for_alloc_id(fx.module, ptr.alloc_id, alloc.align);
+                                let local_data_id = fx.module.declare_data_in_func(data_id, &mut fx.bcx.func);
+                                #[cfg(debug_assertions)]
+                                fx.add_entity_comment(local_data_id, format!("{:?}", ptr.alloc_id));
+                                fx.bcx.ins().global_value(fx.pointer_type, local_data_id)
+                            }
+                            Some(GlobalAlloc::Function(instance)) => {
+                                let func_id = crate::abi::import_function(fx.tcx, fx.module, instance);
+                                let local_func_id = fx.module.declare_func_in_func(func_id, &mut fx.bcx.func);
+                                fx.bcx.ins().func_addr(fx.pointer_type, local_func_id)
+                            }
+                            Some(GlobalAlloc::Static(def_id)) => {
+                                assert!(fx.tcx.is_static(def_id));
+                                let linkage = crate::linkage::get_static_ref_linkage(fx.tcx, def_id);
+                                let data_id = data_id_for_static(fx.tcx, fx.module, def_id, linkage);
+                                let local_data_id = fx.module.declare_data_in_func(data_id, &mut fx.bcx.func);
+                                #[cfg(debug_assertions)]
+                                fx.add_entity_comment(local_data_id, format!("{:?}", def_id));
+                                fx.bcx.ins().global_value(fx.pointer_type, local_data_id)
+                            }
+                            None => bug!("missing allocation {:?}", ptr.alloc_id),
+                        };
+                        let val = fx.bcx.ins().iadd_imm(base_addr, i64::try_from(ptr.offset.bytes()).unwrap());
+                        return CValue::by_val(val, layout);
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+
+    trans_const_place(fx, const_).to_cvalue(fx)
 }
 
 fn trans_const_place<'tcx>(
@@ -172,7 +197,10 @@ fn trans_const_place<'tcx>(
     let alloc_id = fx.tcx.alloc_map.lock().create_memory_alloc(alloc);
     fx.constants_cx.todo.insert(TodoItem::Alloc(alloc_id));
     let data_id = data_id_for_alloc_id(fx.module, alloc_id, alloc.align);
-    cplace_for_dataid(fx, const_.ty, data_id)
+    let local_data_id = fx.module.declare_data_in_func(data_id, &mut fx.bcx.func);
+    #[cfg(debug_assertions)]
+    fx.add_entity_comment(local_data_id, format!("{:?}", alloc_id));
+    cplace_for_dataid(fx, const_.ty, local_data_id)
 }
 
 fn data_id_for_alloc_id<B: Backend>(
@@ -184,6 +212,7 @@ fn data_id_for_alloc_id<B: Backend>(
         .declare_data(
             &format!("__alloc_{}", alloc_id.0),
             Linkage::Local,
+            false,
             false,
             Some(align.bytes() as u8),
         )
@@ -211,11 +240,14 @@ fn data_id_for_static(
         .pref
         .bytes();
 
+    let attrs = tcx.codegen_fn_attrs(def_id);
+
     let data_id = module
         .declare_data(
             &*symbol_name,
             linkage,
             is_mutable,
+            attrs.flags.contains(rustc::hir::CodegenFnAttrFlags::THREAD_LOCAL),
             Some(align.try_into().unwrap()),
         )
         .unwrap();
@@ -249,9 +281,8 @@ fn data_id_for_static(
 fn cplace_for_dataid<'tcx>(
     fx: &mut FunctionCx<'_, 'tcx, impl Backend>,
     ty: Ty<'tcx>,
-    data_id: DataId,
+    local_data_id: GlobalValue,
 ) -> CPlace<'tcx> {
-    let local_data_id = fx.module.declare_data_in_func(data_id, &mut fx.bcx.func);
     let global_ptr = fx.bcx.ins().global_value(fx.pointer_type, local_data_id);
     let layout = fx.layout_of(fx.monomorphize(&ty));
     assert!(!layout.is_unsized(), "unsized statics aren't supported");
