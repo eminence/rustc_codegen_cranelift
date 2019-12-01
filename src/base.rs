@@ -615,7 +615,7 @@ pub fn trans_place<'tcx>(
         PlaceBase::Local(local) => fx.get_local_place(*local),
         PlaceBase::Static(static_) => match static_.kind {
             StaticKind::Static => {
-                crate::constant::codegen_static_ref(fx, static_.def_id, static_.ty)
+                unreachable!("Will be removed");
             }
             StaticKind::Promoted(promoted, substs) => {
                 let instance = Instance::new(static_.def_id, fx.monomorphize(&substs));

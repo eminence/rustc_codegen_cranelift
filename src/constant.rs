@@ -38,16 +38,6 @@ pub fn codegen_static(constants_cx: &mut ConstantCx, def_id: DefId) {
     constants_cx.todo.insert(TodoItem::Static(def_id));
 }
 
-pub fn codegen_static_ref<'tcx>(
-    fx: &mut FunctionCx<'_, 'tcx, impl Backend>,
-    def_id: DefId,
-    ty: Ty<'tcx>,
-) -> CPlace<'tcx> {
-    let linkage = crate::linkage::get_static_ref_linkage(fx.tcx, def_id);
-    let data_id = data_id_for_static(fx.tcx, fx.module, def_id, linkage);
-    cplace_for_dataid(fx, ty, data_id)
-}
-
 pub fn trans_promoted<'tcx>(
     fx: &mut FunctionCx<'_, 'tcx, impl Backend>,
     instance: Instance<'tcx>,
