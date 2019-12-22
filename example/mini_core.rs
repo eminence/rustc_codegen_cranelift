@@ -47,6 +47,7 @@ unsafe impl Copy for u8 {}
 unsafe impl Copy for u16 {}
 unsafe impl Copy for u32 {}
 unsafe impl Copy for u64 {}
+unsafe impl Copy for u128 {}
 unsafe impl Copy for usize {}
 unsafe impl Copy for i8 {}
 unsafe impl Copy for i16 {}
@@ -200,6 +201,14 @@ pub trait Rem<RHS = Self> {
     fn rem(self, rhs: RHS) -> Self::Output;
 }
 
+impl Rem for u32 {
+    type Output = Self;
+
+    fn rem(self, rhs: Self) -> Self {
+        self % rhs
+    }
+}
+
 impl Rem for usize {
     type Output = Self;
 
@@ -271,6 +280,15 @@ impl PartialEq for u64 {
         (*self) == (*other)
     }
     fn ne(&self, other: &u64) -> bool {
+        (*self) != (*other)
+    }
+}
+
+impl PartialEq for u128 {
+    fn eq(&self, other: &u128) -> bool {
+        (*self) == (*other)
+    }
+    fn ne(&self, other: &u128) -> bool {
         (*self) != (*other)
     }
 }

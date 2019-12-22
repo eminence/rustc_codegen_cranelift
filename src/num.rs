@@ -144,28 +144,38 @@ pub fn trans_int_binop<'tcx>(
     let lhs = in_lhs.load_scalar(fx);
     let rhs = in_rhs.load_scalar(fx);
 
-    let b = fx.bcx.ins();
     let val = match bin_op {
-        BinOp::Add => b.iadd(lhs, rhs),
-        BinOp::Sub => b.isub(lhs, rhs),
-        BinOp::Mul => b.imul(lhs, rhs),
+        BinOp::Add => fx.bcx.ins().iadd(lhs, rhs),
+        BinOp::Sub => fx.bcx.ins().isub(lhs, rhs),
+        BinOp::Mul => fx.bcx.ins().imul(lhs, rhs),
         BinOp::Div => {
             if signed {
-                b.sdiv(lhs, rhs)
+                fx.bcx.ins().sdiv(lhs, rhs)
             } else {
-                b.udiv(lhs, rhs)
+                fx.bcx.ins().udiv(lhs, rhs)
             }
         }
         BinOp::Rem => {
             if signed {
-                b.srem(lhs, rhs)
+                fx.bcx.ins().srem(lhs, rhs)
             } else {
-                b.urem(lhs, rhs)
+                if let Some(rhs_imm) = crate::common::resolve_value_imm(&fx.bcx.func, rhs) {
+                    if rhs_imm == 1 {
+                        return CValue::const_val(fx, in_lhs.layout().ty, 0);
+                    } else if rhs_imm.is_power_of_two() {
+                        let pow = rhs_imm.trailing_zeros() - 1;
+                        assert!(pow < u32::from(fx.bcx.func.dfg.value_type(rhs).bits()));
+                        let bit_mask: u64 = (2 << pow) - 1;
+                        let masked = fx.bcx.ins().band_imm(lhs, bit_mask as i64);
+                        return CValue::by_val(masked, in_lhs.layout());
+                    }
+                }
+                fx.bcx.ins().urem(lhs, rhs)
             }
         }
-        BinOp::BitXor => b.bxor(lhs, rhs),
-        BinOp::BitAnd => b.band(lhs, rhs),
-        BinOp::BitOr => b.bor(lhs, rhs),
+        BinOp::BitXor => fx.bcx.ins().bxor(lhs, rhs),
+        BinOp::BitAnd => fx.bcx.ins().band(lhs, rhs),
+        BinOp::BitOr => fx.bcx.ins().bor(lhs, rhs),
         BinOp::Shl => {
             let lhs_ty = fx.bcx.func.dfg.value_type(lhs);
             let rhs = clif_intcast(fx, rhs, lhs_ty, false);

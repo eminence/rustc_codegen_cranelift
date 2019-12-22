@@ -34,7 +34,7 @@ $RUSTC example/example.rs --crate-type lib
 #JIT_ARGS="abc bcd" jit mini_core_hello_world example/mini_core_hello_world.rs
 
 echo "[AOT] mini_core_hello_world"
-$RUSTC example/mini_core_hello_world.rs --crate-name mini_core_hello_world --crate-type bin -g
+$RUSTC example/mini_core_hello_world.rs -Zmir-opt-level=0 --crate-name mini_core_hello_world --crate-type bin -g
 ./target/out/mini_core_hello_world abc bcd
 # (echo "break set -n main"; echo "run"; sleep 1; echo "si -c 10"; sleep 1; echo "frame variable") | lldb -- ./target/out/mini_core_hello_world abc bcd
 
