@@ -23,6 +23,9 @@ $ CHANNEL="release" $cg_clif_dir/cargo.sh run
 
 If you compiled cg_clif in debug mode you should use `CHANNEL="debug"` instead or omit `CHANNEL="release"` completely.
 
+Also, you must use the exact same nightly compiler as you used to compile `rustc_codegen_cranelift`, or else you'll see
+errors about missing librustc_driver libraries.
+
 ### Rustc
 
 ```bash
